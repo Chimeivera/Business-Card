@@ -1,0 +1,1498 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>廠商名片維護系統</title>
+    <!-- 載入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 載入 Lucide Icons (用於美觀的圖標) -->
+    <script type="module">
+        // 匯入更多圖標供使用
+        import { createIcons, Search, PlusCircle, Trash2, Edit, X, Smartphone, Mail, Building, Tag, User, Phone, Layers, NotebookText, Plus, Upload, Replace, List, Pencil, Download } from 'https://cdn.jsdelivr.net/npm/lucide-esm@latest/umd/lucide-esm.js';
+        createIcons({ icons: { Search, PlusCircle, Trash2, Edit, X, Smartphone, Mail, Building, Tag, User, Phone, Layers, NotebookText, Plus, Upload, Replace, List, Pencil, Download } });
+    </script>
+    <style>
+        /* 設定字體為 Inter，並為中文提供備用字體 */
+        body {
+            font-family: 'Inter', 'Noto Sans TC', sans-serif;
+            background-color: #f8fafc; /* Tailwind slate-50 */
+        }
+        /* 自定義捲軸樣式 */
+        .custom-scroll::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background-color: #cbd5e1; /* slate-300 */
+            border-radius: 2px;
+        }
+        .custom-scroll::-webkit-scrollbar-track {
+            background-color: transparent;
+        }
+        /* Modal 覆蓋整個畫面 */
+        .modal {
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        .modal-active {
+            opacity: 1;
+            visibility: visible;
+        }
+        .modal-inactive {
+            opacity: 0;
+            visibility: hidden;
+        }
+        /* 隱藏檔案輸入欄位 */
+        #csv-file-input {
+            display: none;
+        }
+        /* 讓手機上的 select 更好看 */
+        select {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%236B7280'%3E%3Cpath fill-rule='evenodd' d='M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.25 4.25a.75.75 0 01-1.06 0L5.21 8.27a.75.75 0 01.02-1.06z' clip-rule='evenodd' /%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.75rem center;
+            background-size: 1.5em 1.5em;
+            padding-right: 2.5rem;
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+
+    <!-- 主應用程式介面 -->
+    <div id="app" class="max-w-4xl mx-auto p-4 md:p-6">
+        <header class="mb-6">
+            <h1 class="text-3xl font-extrabold text-blue-700 flex items-center">
+                <svg width="30" height="30" class="mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                廠商名片維護系統
+            </h1>
+            <p class="text-sm text-gray-500 mt-1">用戶 ID: <span id="user-id" class="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded">載入中...</span></p>
+        </header>
+
+        <!-- 搜尋與操作按鈕區域 -->
+        <div class="mb-6 flex flex-col gap-3">
+            <!-- 搜尋欄 -->
+            <div class="relative flex-grow">
+                <input type="text" id="search-input" oninput="app.updateFilter()" placeholder="輸入廠商名稱、業務、電話或處理項目進行搜尋..."
+                       class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:border-blue-500 focus:ring focus:ring-blue-200 transition">
+                <i data-lucide="search" class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400"></i>
+            </div>
+            
+            <!-- 新增 & 匯入 & 匯出按鈕群組 -->
+            <div class="flex flex-wrap gap-3">
+                <!-- 新增廠商按鈕 -->
+                <button onclick="app.openVendorModal('add')"
+                        class="flex-1 min-w-[80px] flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-3 rounded-xl shadow-md transition duration-200 text-sm">
+                    <i data-lucide="plus-circle" class="w-4 h-4 mr-1"></i>
+                    新增
+                </button>
+                <!-- 匯入 CSV 按鈕 -->
+                <button onclick="app.openImportModal()"
+                        class="flex-1 min-w-[80px] flex items-center justify-center bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-3 rounded-xl shadow-md transition duration-200 text-sm">
+                    <i data-lucide="upload" class="w-4 h-4 mr-1"></i>
+                    匯入 CSV
+                </button>
+                 <!-- 匯出 CSV 按鈕 -->
+                <button onclick="app.exportVendorsToCSV()"
+                        class="flex-1 min-w-[80px] flex items-center justify-center bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-3 rounded-xl shadow-md transition duration-200 text-sm">
+                    <i data-lucide="download" class="w-4 h-4 mr-1"></i>
+                    匯出 CSV
+                </button>
+            </div>
+        </div>
+
+        <!-- 類別篩選區域 (拉霸式) -->
+        <div class="mb-6 flex items-center gap-3">
+            <div class="flex-grow">
+                <!-- 類別下拉選單 -->
+                <select id="category-select" onchange="app.selectCategory(this.value)"
+                        class="w-full border border-gray-300 p-2 rounded-xl focus:border-blue-500 focus:ring focus:ring-blue-200 transition bg-white shadow-sm font-medium text-gray-700">
+                    <option value="">全部廠商</option>
+                    <!-- Options populated by JS -->
+                </select>
+            </div>
+            <!-- 類別維護按鈕 -->
+            <button onclick="app.openCategoryModal()" title="維護分類列表"
+                    class="flex-shrink-0 bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-3 rounded-xl shadow-md transition duration-200 text-sm">
+                <i data-lucide="list" class="w-4 h-4"></i>
+            </button>
+        </div>
+
+        <!-- 廠商列表區域 -->
+        <div id="vendor-list" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <p id="loading-message" class="text-center text-gray-500 col-span-full">
+                從資料庫載入中...
+            </p>
+            <p id="no-results-message" class="text-center text-gray-500 col-span-full hidden">
+                沒有找到符合條件的廠商資料。
+            </p>
+            <!-- 廠商卡片將由 JS 動態生成 -->
+        </div>
+
+    </div>
+
+    <!-- 匯入 CSV Modal 視窗 -->
+    <div id="import-modal" class="modal modal-inactive fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+        <div class="bg-white rounded-2xl w-full max-w-lg shadow-2xl transform transition-all duration-300 scale-100 modal-content" role="dialog" aria-modal="true">
+            <!-- Modal Header -->
+            <div class="flex justify-between items-center p-5 border-b border-gray-100">
+                <h2 class="text-xl font-bold text-gray-800">匯入廠商名片 (CSV)</h2>
+                <button onclick="app.closeImportModal()" class="text-gray-400 hover:text-gray-600 transition">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+
+            <!-- Modal Body (Form) -->
+            <div class="p-5 space-y-4">
+                <p class="text-sm text-gray-600 border-b pb-4">
+                    系統將自動解析您上傳的檔案名稱作為匯入資料的**類別**。
+                    請確認您的 CSV 檔案包含以下主要欄位：
+                </p>
+                <ul class="text-xs font-mono bg-gray-100 p-3 rounded-lg text-gray-700">
+                    <li><span class="font-bold">公司名稱</span> (必要)</li>
+                    <li><span class="font-bold">業務</span> 或 <span class="font-bold">姓名</span> (必要)</li>
+                    <li>手機, Mail, 代理廠牌, 處理項目等</li>
+                </ul>
+                
+                <!-- 步驟 1: 選擇檔案 -->
+                <div class="pt-4 border-t border-gray-100">
+                    <label class="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+                        <i data-lucide="file-text" class="w-4 h-4 mr-1 text-blue-500"></i>
+                        **步驟 1: 選擇 CSV 檔案**
+                    </label>
+                    <input type="file" id="csv-file-input" accept=".csv" onchange="app.handleFileSelect()">
+                    <button onclick="document.getElementById('csv-file-input').click()" id="select-file-button"
+                            class="w-full flex items-center justify-center bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-xl shadow transition duration-200">
+                        <i data-lucide="upload-cloud" class="w-5 h-5 mr-2"></i>
+                        選擇 CSV 檔案
+                    </button>
+                    <p id="file-name-display" class="mt-2 text-sm text-gray-500 text-center truncate">尚未選擇檔案</p>
+                </div>
+                
+                <!-- 匯入資訊顯示 & 模式選擇 -->
+                <div id="import-info-display" class="pt-4 border-t border-gray-100 space-y-3 hidden">
+                    <p class="text-sm font-medium text-gray-700 flex items-center">
+                        <i data-lucide="tag" class="w-4 h-4 mr-1 text-purple-500"></i>
+                        目標類別名稱：<span id="target-category-display" class="font-bold text-purple-600 ml-1"></span>
+                    </p>
+                    
+                    <!-- 步驟 2: 選擇匯入模式 -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                            <i data-lucide="replace" class="w-4 h-4 mr-1 text-red-500"></i>
+                            **步驟 2: 選擇匯入模式**
+                        </label>
+                        <select id="import-mode-select"
+                                class="w-full border border-gray-300 p-2 rounded-lg focus:border-red-500 focus:ring focus:ring-red-200 transition bg-white shadow-sm font-medium text-gray-700">
+                            <option value="add">模式：僅新增 (保留現有資料)</option>
+                            <option value="replace" class="text-red-600 font-bold">模式：取代 (將刪除 [目標類別] 中所有舊資料)</option>
+                        </select>
+                        <p id="replace-warning" class="text-xs text-red-500 mt-1 hidden font-semibold">警告：選擇「取代」模式將永久刪除目標類別中所有現有的廠商資料。</p>
+                    </div>
+                </div>
+
+                <!-- 匯入按鈕 -->
+                <div class="pt-2">
+                    <button onclick="app.importVendorsFromCSV()" id="start-import-button" disabled
+                            class="w-full bg-blue-400 text-white font-semibold py-3 px-4 rounded-xl shadow transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-600">
+                        請先選擇檔案
+                    </button>
+                    <p id="import-status" class="mt-3 text-center text-sm text-red-500 hidden"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新增/編輯 廠商 Modal 視窗 -->
+    <div id="vendor-modal" class="modal modal-inactive fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+        <div class="bg-white rounded-2xl w-full max-w-md shadow-2xl transform transition-all duration-300 scale-100 modal-content" role="dialog" aria-modal="true">
+            <!-- Modal Header -->
+            <div class="flex justify-between items-center p-5 border-b border-gray-100">
+                <h2 id="modal-title" class="text-xl font-bold text-gray-800">新增廠商名片</h2>
+                <button onclick="app.closeVendorModal()" class="text-gray-400 hover:text-gray-600 transition">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+
+            <!-- Modal Body (Form) -->
+            <form id="vendor-form" class="p-5 space-y-4" onsubmit="app.saveVendor(event)">
+                <input type="hidden" id="vendor-id-field">
+
+                <!-- 類別 (Category) -->
+                <div>
+                    <label for="category-field" class="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                        <i data-lucide="tag" class="w-4 h-4 mr-1 text-blue-500"></i>
+                        類別 (必填)
+                    </label>
+                    <!-- 類別下拉選單內容由 JS 動態填充 -->
+                    <select id="category-field" required
+                            class="w-full border border-gray-300 p-2 rounded-lg focus:border-blue-500 focus:ring focus:ring-blue-200 transition">
+                        <option value="">請選擇類別</option>
+                    </select>
+                </div>
+
+                <!-- 公司名稱 (Company Name) -->
+                <div>
+                    <label for="company-name-field" class="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                        <i data-lucide="building" class="w-4 h-4 mr-1 text-blue-500"></i>
+                        公司名稱 (必填)
+                    </label>
+                    <input type="text" id="company-name-field" required
+                           class="w-full border border-gray-300 p-2 rounded-lg focus:border-blue-500 focus:ring focus:ring-blue-200 transition">
+                </div>
+
+                <!-- 業務/聯絡人 (Contact Person) -->
+                <div>
+                    <label for="contact-person-field" class="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                        <i data-lucide="user" class="w-4 h-4 mr-1 text-blue-500"></i>
+                        業務/聯絡人 (必填)
+                    </label>
+                    <input type="text" id="contact-person-field" required
+                           class="w-full border border-gray-300 p-2 rounded-lg focus:border-blue-500 focus:ring focus:ring-blue-200 transition">
+                </div>
+
+                <!-- 手機/電話 (Mobile/Phone) -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label for="mobile-field" class="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                            <i data-lucide="smartphone" class="w-4 h-4 mr-1 text-blue-500"></i>
+                            手機
+                        </label>
+                        <input type="tel" id="mobile-field"
+                               class="w-full border border-gray-300 p-2 rounded-lg focus:border-blue-500 focus:ring focus:ring-blue-200 transition">
+                    </div>
+                    <div>
+                        <label for="phone-field" class="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                            <i data-lucide="phone" class="w-4 h-4 mr-1 text-blue-500"></i>
+                            公司電話
+                        </label>
+                        <input type="tel" id="phone-field"
+                               class="w-full border border-gray-300 p-2 rounded-lg focus:border-blue-500 focus:ring focus:ring-blue-200 transition">
+                    </div>
+                </div>
+
+                <!-- E-mail -->
+                <div>
+                    <label for="email-field" class="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                        <i data-lucide="mail" class="w-4 h-4 mr-1 text-blue-500"></i>
+                        E-mail
+                    </label>
+                    <input type="email" id="email-field"
+                           class="w-full border border-gray-300 p-2 rounded-lg focus:border-blue-500 focus:ring focus:ring-blue-200 transition">
+                </div>
+
+                <!-- 代理廠牌 (Agency Brand) -->
+                <div>
+                    <label for="brand-field" class="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                        <i data-lucide="layers" class="w-4 h-4 mr-1 text-blue-500"></i>
+                        代理廠牌
+                    </label>
+                    <input type="text" id="brand-field"
+                           class="w-full border border-gray-300 p-2 rounded-lg focus:border-blue-500 focus:ring focus:ring-blue-200 transition">
+                </div>
+
+                <!-- 處理項目/備註 (Notes) -->
+                <div>
+                    <label for="notes-field" class="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                        <i data-lucide="notebook-text" class="w-4 h-4 mr-1 text-blue-500"></i>
+                        處理項目/備註
+                    </label>
+                    <textarea id="notes-field" rows="3"
+                              class="w-full border border-gray-300 p-2 rounded-lg focus:border-blue-500 focus:ring focus:ring-blue-200 transition"></textarea>
+                </div>
+
+                <!-- Modal Footer (Submit Button) -->
+                <div class="pt-4 border-t border-gray-100 flex justify-end">
+                    <button type="submit" id="save-button"
+                            class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-xl shadow transition duration-200">
+                        儲存名片資料
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 廠商類別維護 Modal 視窗 -->
+    <div id="category-add-modal" class="modal modal-inactive fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+        <div class="bg-white rounded-2xl w-full max-w-lg shadow-2xl transform transition-all duration-300 scale-100 modal-content" role="dialog" aria-modal="true">
+            <!-- Modal Header -->
+            <div class="flex justify-between items-center p-5 border-b border-gray-100">
+                <h2 class="text-xl font-bold text-gray-800">廠商類別維護</h2>
+                <button onclick="app.closeCategoryModal()" class="text-gray-400 hover:text-gray-600 transition">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+
+            <!-- Modal Body (Form) -->
+            <div class="p-5 space-y-6">
+                <!-- 新增類別區域 -->
+                <form id="category-form" class="space-y-4 pb-4 border-b border-gray-200" onsubmit="app.handleCategorySubmit(event)">
+                    <p class="text-sm font-medium text-gray-700 flex items-center">
+                        <i data-lucide="plus" class="w-4 h-4 mr-1 text-blue-500"></i>
+                        新增新的類別
+                    </p>
+                    <div class="flex gap-2">
+                        <input type="text" id="new-category-name-field" required
+                            class="flex-grow border border-gray-300 p-2 rounded-lg focus:border-blue-500 focus:ring focus:ring-blue-200 transition"
+                            placeholder="請輸入類別名稱">
+                        <button type="submit"
+                                class="flex-shrink-0 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-xl shadow transition duration-200">
+                            新增
+                        </button>
+                    </div>
+                </form>
+
+                <!-- 現有類別列表 -->
+                <div>
+                    <p class="text-sm font-medium text-gray-700 mb-3 flex items-center">
+                        <i data-lucide="list" class="w-4 h-4 mr-1 text-gray-500"></i>
+                        現有自定義類別 (點擊可編輯)
+                    </p>
+                    <div id="custom-category-list" class="space-y-2 max-h-64 custom-scroll overflow-y-auto pr-2">
+                        <p class="text-sm text-gray-500">載入中...</p>
+                        <!-- Dynamic categories will be rendered here -->
+                    </div>
+                    <p class="text-xs text-red-500 mt-3">注意：編輯或刪除類別不會影響已屬於該類別的廠商資料，但廠商將失去分類標籤。</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 類別編輯 Modal (單獨用於編輯) -->
+    <div id="category-edit-modal" class="modal modal-inactive fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+        <div class="bg-white rounded-2xl w-full max-w-sm shadow-2xl transform transition-all duration-300 scale-100 modal-content" role="dialog" aria-modal="true">
+            <div class="flex justify-between items-center p-5 border-b border-gray-100">
+                <h2 class="text-xl font-bold text-gray-800">編輯類別名稱</h2>
+                <button onclick="app.closeCategoryEditModal()" class="text-gray-400 hover:text-gray-600 transition">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+            <form id="category-edit-form" class="p-5 space-y-4" onsubmit="app.updateCategoryName(event)">
+                <input type="hidden" id="edit-category-id-field">
+                <input type="hidden" id="edit-category-original-name-field">
+                <div>
+                    <label for="edit-category-name-field" class="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                        <i data-lucide="tag" class="w-4 h-4 mr-1 text-blue-500"></i>
+                        新類別名稱
+                    </label>
+                    <input type="text" id="edit-category-name-field" required
+                           class="w-full border border-gray-300 p-2 rounded-lg focus:border-blue-500 focus:ring focus:ring-blue-200 transition"
+                           placeholder="請輸入類別名稱">
+                </div>
+                <div class="pt-4 border-t border-gray-100 flex justify-end">
+                    <button type="submit"
+                            class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-xl shadow transition duration-200">
+                        確認修改
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <!-- 訊息提示 (Toast Notification) -->
+    <div id="toast-message" class="fixed bottom-4 right-4 bg-gray-800 text-white px-4 py-3 rounded-xl shadow-lg transition-opacity duration-300 opacity-0 z-50">
+        <!-- Message content here -->
+    </div>
+
+    <!-- Firebase 腳本 -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, deleteDoc, onSnapshot, collection, query, addDoc, serverTimestamp, writeBatch, getDocs, where, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore-lite.js";
+
+        // =========================================================================
+        // [註釋] 您提供的 Firebase 配置資訊 (已由 Canvas 環境自動處理連線，無需手動填寫)
+        // const USER_PROVIDED_FIREBASE_CONFIG = {
+        //   apiKey: "AIzaSyA8XjJcjoqVUBZtJxbAjUevb6DGWvIiMNU",
+        //   authDomain: "manufacturer-business-card.firebaseapp.com",
+        //   projectId: "manufacturer-business-card",
+        //   storageBucket: "manufacturer-business-card.firebasestorage.app",
+        //   messagingSenderId: "69572427791",
+        //   appId: "1:69572427791:web:c962f700d6fd4e3a3e237a",
+        //   measurementId: "G-DV3PZEEH7H"
+        // };
+        // =========================================================================
+
+        // 設定 Firestore 偵錯等級
+        setLogLevel('Debug');
+
+        // 全域變數，從 Canvas 環境注入
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-vendor-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        
+        // 公共資料 Collection 名稱
+        const PUBLIC_CATEGORY_COLLECTION = 'vendor_categories';
+
+        let db, auth;
+        let userId = null;
+        let vendors = [];
+        let currentCategory = ''; // 目前篩選的類別
+        let searchTerm = ''; // 目前的搜尋詞彙
+        let csvImportData = {
+            data: [],
+            fileName: '', 
+            category: '' 
+        }; 
+
+        // 儲存動態類別的 ID 和名稱，用於維護功能
+        let categoryMap = new Map(); 
+
+        // 預設的廠商類別列表 (作為基礎列表)
+        const BASE_CATEGORIES = [
+            '一般類', '衛材類', '儀器設備類', '器械類', '檢驗類', '超音波',
+            '內視鏡影像系統', '手術用顯微', '放腫核醫廠商', '麻藥廠商',
+            '洗腎相關耗材', '儀器零件類', '資訊連線', '其他類',
+            '牙科', '輪椅', '其他醫院', '單位連絡人', '未分類_Sheet1', '未分類_工作表1'
+        ];
+        
+        // CSV 欄位與資料庫欄位的對應關係 (新增 '姓名' 對應 'contactPerson')
+        const CSV_HEADER_MAP = {
+            '公司名稱': 'companyName',
+            '業務': 'contactPerson',
+            '姓名': 'contactPerson', // 增加 '姓名' 欄位對應
+            '手機': 'mobile',
+            '電話': 'phone', // 增加 '電話' 欄位對應
+            'Mail': 'email',
+            '代理廠牌': 'brand',
+            '處理項目': 'notes',
+            // 額外欄位，統一歸入備註/處理項目
+            '位置': 'notes', 
+            '營業項目': 'notes',
+            '': 'notes', // 處理空標頭
+        };
+
+        // 應用程式狀態物件
+        window.app = {
+            db: null,
+            auth: null,
+            userId: null,
+            vendors: [],
+            currentCategory: '',
+            searchTerm: '',
+            dynamicCategories: [], // 包含 BASE_CATEGORIES 和 Firestore 新增的類別名稱
+            categoryMap: categoryMap, // Map<name, {id, name}> for custom categories
+            BASE_CATEGORIES: BASE_CATEGORIES,
+            csvImportData: csvImportData, 
+            
+            // ------------------
+            // 初始化
+            // ------------------
+            initialize: async function() {
+                if (!firebaseConfig) {
+                    this.showMessage("錯誤：Firebase 配置資訊遺失。", 'red');
+                    return;
+                }
+
+                try {
+                    const firebaseApp = initializeApp(firebaseConfig);
+                    this.db = getFirestore(firebaseApp);
+                    this.auth = getAuth(firebaseApp);
+                    
+                    // 登入或匿名登入
+                    const user = await new Promise(resolve => {
+                        const unsubscribe = onAuthStateChanged(this.auth, (user) => {
+                            // 確保 onAuthStateChanged 監聽器只運行一次
+                            unsubscribe(); 
+                            // 如果用戶已登入，直接解析
+                            if (user) {
+                                resolve(user);
+                                return;
+                            }
+                            
+                            // 處理自定義 token 登入
+                            if (initialAuthToken) {
+                                signInWithCustomToken(this.auth, initialAuthToken).then(res => resolve(res.user)).catch(e => {
+                                    console.error("Custom token sign-in failed, trying anonymous.", e);
+                                    signInAnonymously(this.auth).then(res => resolve(res.user)).catch(e => {
+                                        console.error("Anonymous sign-in failed.", e);
+                                        resolve(null);
+                                    });
+                                });
+                            } else {
+                                // 匿名登入
+                                signInAnonymously(this.auth).then(res => resolve(res.user)).catch(e => {
+                                    console.error("Anonymous sign-in failed.", e);
+                                    resolve(null);
+                                });
+                            }
+                        });
+                    });
+
+                    if (user) {
+                        this.userId = user.uid || crypto.randomUUID(); 
+                        document.getElementById('user-id').textContent = this.userId;
+                        
+                        this.loadCategories(); 
+                        this.loadVendors();
+                        
+                        // 監聽匯入模式的變動 
+                        const importModeSelect = document.getElementById('import-mode-select');
+                        const replaceWarning = document.getElementById('replace-warning');
+                        if (importModeSelect && replaceWarning) {
+                            importModeSelect.addEventListener('change', (e) => {
+                                if (e.target.value === 'replace') {
+                                    replaceWarning.classList.remove('hidden');
+                                } else {
+                                    replaceWarning.classList.add('hidden');
+                                }
+                            });
+                        }
+                    } else {
+                        // 如果無法登入，給予隨機 ID
+                        this.userId = crypto.randomUUID(); 
+                        document.getElementById('user-id').textContent = '匿名用戶 (讀寫受限)';
+                        this.showMessage("無法驗證用戶，資料將無法讀寫。", 'red');
+                    }
+                    
+
+                } catch (error) {
+                    console.error("Firebase 初始化錯誤:", error);
+                    this.showMessage("Firebase 初始化失敗：" + error.message, 'red');
+                }
+            },
+
+            // ------------------
+            // Firestore 相關
+            // ------------------
+
+            // 獲取廠商資料的 Collection 路徑 (Private)
+            getVendorCollectionPath: function() {
+                return `artifacts/${appId}/users/${this.userId}/vendor_cards`;
+            },
+            
+            // 獲取類別資料的 Collection 路徑 (Public)
+            getCategoryCollectionPath: function() {
+                return `artifacts/${appId}/public/data/${PUBLIC_CATEGORY_COLLECTION}`;
+            },
+
+            // 載入廠商資料並即時監聽
+            loadVendors: function() {
+                if (!this.userId || !this.db) {
+                    console.warn("Firestore 或 User ID 尚未準備好。");
+                    return;
+                }
+
+                const collectionRef = collection(this.db, this.getVendorCollectionPath());
+                
+                onSnapshot(collectionRef, (snapshot) => {
+                    this.vendors = snapshot.docs.map(doc => ({
+                        id: doc.id,
+                        ...doc.data()
+                    })).sort((a, b) => (a.companyName || '').localeCompare(b.companyName || '', 'zh-TW')); 
+
+                    this.renderVendors();
+                }, (error) => {
+                    console.error("監聽廠商資料錯誤:", error);
+                    this.showMessage("資料載入失敗: " + error.message, 'red');
+                    const loadingMsg = document.getElementById('loading-message');
+                    if (loadingMsg) loadingMsg.textContent = '資料載入失敗。';
+                });
+
+                const loadingMsg = document.getElementById('loading-message');
+                if (loadingMsg) loadingMsg.textContent = '從資料庫載入中...';
+            },
+
+            // 載入動態類別列表並即時監聽 (Public Data)
+            loadCategories: function() {
+                if (!this.db) return;
+
+                const collectionRef = collection(this.db, this.getCategoryCollectionPath());
+                
+                onSnapshot(collectionRef, (snapshot) => {
+                    this.categoryMap.clear();
+                    snapshot.docs.forEach(doc => {
+                        const data = doc.data();
+                        this.categoryMap.set(data.name, { id: doc.id, name: data.name });
+                    });
+                    
+                    const customCategories = Array.from(this.categoryMap.keys());
+                    
+                    // 合併基本和自定義類別，並排序
+                    this.dynamicCategories = [...new Set([...this.BASE_CATEGORIES, ...customCategories])].sort((a, b) => a.localeCompare(b, 'zh-TW'));
+
+                    this.setupCategoryFilters();
+                    this.renderCustomCategoryList(); // 更新類別維護 Modal 中的列表
+                }, (error) => {
+                    console.error("監聽類別資料錯誤:", error);
+                });
+            },
+
+            // 將新類別新增到 Firestore (公共)
+            addCategory: async function(categoryName) {
+                categoryName = categoryName.trim();
+                if (!categoryName) return;
+
+                if (this.dynamicCategories.includes(categoryName)) {
+                    // 如果類別已存在，檢查是否為預設類別。如果是動態類別，則不做任何動作。
+                    if (!this.BASE_CATEGORIES.includes(categoryName)) {
+                         // 已經是動態類別，不需要重複新增
+                         return true; 
+                    }
+                    // 如果是基本類別，則手動將其加入 dynamic collection (可能來自 CSV 檔名)
+                    // 繼續執行新增邏輯
+                }
+                
+                try {
+                    const collectionRef = collection(this.db, this.getCategoryCollectionPath());
+                    await addDoc(collectionRef, {
+                        name: categoryName,
+                        createdAt: serverTimestamp(),
+                    });
+                    this.showMessage(`新類別 [${categoryName}] 已成功新增。`);
+                    return true;
+                } catch (error) {
+                    console.error("新增類別錯誤:", error);
+                    this.showMessage("新增類別失敗: " + error.message, 'red');
+                    return false;
+                }
+            },
+            
+            // 更新類別名稱
+            updateCategoryName: async function(event) {
+                event.preventDefault();
+                const id = document.getElementById('edit-category-id-field').value;
+                const newName = document.getElementById('edit-category-name-field').value.trim();
+                const originalName = document.getElementById('edit-category-original-name-field').value;
+
+                if (!newName || newName === originalName) {
+                    this.closeCategoryEditModal();
+                    return;
+                }
+                
+                if (this.dynamicCategories.includes(newName)) {
+                    this.showMessage(`類別 [${newName}] 已存在，請使用不同名稱。`, 'red');
+                    return;
+                }
+
+                try {
+                    const docRef = doc(this.db, this.getCategoryCollectionPath(), id);
+                    await updateDoc(docRef, { name: newName });
+                    
+                    this.showMessage(`類別 [${originalName}] 已成功更新為 [${newName}]。`);
+                    this.closeCategoryEditModal();
+
+                } catch (error) {
+                    console.error("更新類別名稱錯誤:", error);
+                    this.showMessage("更新類別名稱失敗: " + error.message, 'red');
+                }
+            },
+            
+            // 刪除類別
+            deleteCategory: async function(id, name) {
+                if (!window.confirm(`確定要永久刪除類別 [${name}] 嗎？這將導致所有屬於此類別的廠商資料失去篩選標籤。`)) {
+                    return;
+                }
+                
+                try {
+                    const docRef = doc(this.db, this.getCategoryCollectionPath(), id);
+                    await deleteDoc(docRef);
+                    this.showMessage(`類別 [${name}] 已成功刪除。`);
+                } catch (error) {
+                    console.error("刪除類別錯誤:", error);
+                    this.showMessage("刪除類別失敗: " + error.message, 'red');
+                }
+            },
+
+
+            // 儲存或更新廠商資料
+            saveVendor: async function(event) {
+                event.preventDefault();
+
+                const id = document.getElementById('vendor-id-field').value;
+                const data = {
+                    category: document.getElementById('category-field').value.trim(),
+                    companyName: document.getElementById('company-name-field').value.trim(),
+                    contactPerson: document.getElementById('contact-person-field').value.trim(),
+                    mobile: document.getElementById('mobile-field').value.trim(),
+                    phone: document.getElementById('phone-field').value.trim(),
+                    email: document.getElementById('email-field').value.trim(),
+                    brand: document.getElementById('brand-field').value.trim(),
+                    notes: document.getElementById('notes-field').value.trim(),
+                };
+
+                if (!data.category || !data.companyName || !data.contactPerson) {
+                    this.showMessage("請填寫所有必填欄位 (類別、公司名稱、業務/聯絡人)。", 'red');
+                    return;
+                }
+
+                this.closeVendorModal();
+
+                try {
+                    if (id) {
+                        const docRef = doc(this.db, this.getVendorCollectionPath(), id);
+                        await setDoc(docRef, data, { merge: true });
+                        this.showMessage(`廠商 [${data.companyName}] 更新成功！`);
+                    } else {
+                        const collectionRef = collection(this.db, this.getVendorCollectionPath());
+                        await addDoc(collectionRef, {
+                            ...data,
+                            createdAt: serverTimestamp(),
+                        });
+                        this.showMessage(`廠商 [${data.companyName}] 新增成功！`);
+                    }
+                } catch (error) {
+                    console.error("儲存廠商資料錯誤:", error);
+                    this.showMessage("儲存資料失敗: " + error.message, 'red');
+                }
+            },
+            
+            // 刪除廠商資料
+            deleteVendor: async function(id, companyName) {
+                if (!window.confirm(`確定要刪除廠商 [${companyName}] 的資料嗎？`)) {
+                    return;
+                }
+
+                try {
+                    const docRef = doc(this.db, this.getVendorCollectionPath(), id);
+                    await deleteDoc(docRef);
+                    this.showMessage(`廠商 [${companyName}] 已成功刪除。`);
+                } catch (error) {
+                    console.error("刪除廠商資料錯誤:", error);
+                    this.showMessage("刪除資料失敗: " + error.message, 'red');
+                }
+            },
+
+
+            // ------------------
+            // CSV 匯入相關
+            // ------------------
+            
+            // 從檔名中解析出類別名稱
+            parseCategoryFromFileName: function(fileName) {
+                let categoryName = fileName.replace(/\.csv$/i, '').trim();
+                
+                // 處理 'Soin廠商名片資料.xls - 類別名' 這種格式
+                const prefixMatch = categoryName.match(/^(.*?) - (.*)$/);
+                if (prefixMatch && prefixMatch.length === 3) {
+                    categoryName = prefixMatch[2].trim();
+                } else {
+                    // 處理 Sheet1, 工作表1 等預設名稱
+                    if (categoryName.endsWith('Sheet1')) {
+                        categoryName = '未分類_Sheet1';
+                    } else if (categoryName.endsWith('工作表1')) {
+                        categoryName = '未分類_工作表1';
+                    } else if (categoryName.endsWith('單位連絡人')) {
+                         categoryName = '單位連絡人';
+                    }
+                }
+                
+                return categoryName;
+            },
+
+            // 處理 CSV 檔案選擇
+            handleFileSelect: function() {
+                const fileInput = document.getElementById('csv-file-input');
+                const fileNameDisplay = document.getElementById('file-name-display');
+                const startImportButton = document.getElementById('start-import-button');
+                const importInfoDisplay = document.getElementById('import-info-display');
+                const targetCategoryDisplay = document.getElementById('target-category-display');
+                
+                // 重置狀態
+                this.csvImportData.data = [];
+                this.csvImportData.fileName = '';
+                this.csvImportData.category = '';
+                startImportButton.disabled = true;
+                startImportButton.textContent = '請先選擇檔案';
+                fileNameDisplay.textContent = '尚未選擇檔案';
+                importInfoDisplay.classList.add('hidden');
+                document.getElementById('import-status').classList.add('hidden');
+                document.getElementById('import-mode-select').value = 'add'; 
+                document.getElementById('replace-warning').classList.add('hidden');
+
+                if (fileInput.files.length > 0) {
+                    const file = fileInput.files[0];
+                    fileNameDisplay.textContent = `已選擇檔案: ${file.name}`;
+                    
+                    // 1. 自動解析類別名稱
+                    const category = this.parseCategoryFromFileName(file.name);
+                    this.csvImportData.fileName = file.name;
+                    this.csvImportData.category = category;
+                    targetCategoryDisplay.textContent = category;
+                    importInfoDisplay.classList.remove('hidden');
+
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const csvText = e.target.result;
+                        this.parseCSV(csvText);
+                    };
+                    
+                    // 嘗試以 UTF-8 或 Big5 (中文常用) 解碼
+                    try {
+                        reader.readAsText(file, 'UTF-8'); 
+                    } catch (e) {
+                         // Fallback
+                        reader.readAsText(file);
+                    }
+                }
+            },
+
+            // 解析 CSV 文本
+            parseCSV: function(csvText) {
+                const lines = csvText.split('\n');
+                if (lines.length < 2) {
+                    document.getElementById('import-status').textContent = "CSV 檔案內容不足或為空。";
+                    document.getElementById('import-status').classList.remove('hidden');
+                    return;
+                }
+                
+                // 找到第一個非空行作為標頭
+                let headerIndex = 0;
+                let headerLine = '';
+                for (let i = 0; i < lines.length; i++) {
+                    const trimmed = lines[i].trim().replace(/\r/g, '');
+                    if (trimmed) {
+                        headerLine = trimmed;
+                        headerIndex = i;
+                        break;
+                    }
+                }
+
+                if (!headerLine) {
+                    document.getElementById('import-status').textContent = "CSV 檔案中找不到有效的標頭。";
+                    document.getElementById('import-status').classList.remove('hidden');
+                    return;
+                }
+
+                const headers = this.parseCSVLine(headerLine).map(h => h.trim());
+                
+                const importStatus = document.getElementById('import-status');
+                const data = [];
+                
+                // 檢查是否包含必要欄位
+                const hasCompanyName = headers.some(h => h.includes('公司名稱'));
+                const hasContact = headers.some(h => h.includes('業務') || h.includes('姓名'));
+
+                if (!hasCompanyName || !hasContact) {
+                    importStatus.classList.remove('hidden');
+                    importStatus.textContent = '錯誤：CSV 標頭必須包含「公司名稱」和「業務/姓名」的有效欄位。';
+                    document.getElementById('start-import-button').disabled = true;
+                    return;
+                }
+
+                for (let i = headerIndex + 1; i < lines.length; i++) {
+                    const line = lines[i].trim().replace(/\r/g, '');
+                    if (!line) continue;
+                    
+                    const values = this.parseCSVLine(line);
+                    
+                    // 忽略資料長度與標頭不符的行
+                    if (values.length < headers.length) {
+                         continue;
+                    }
+                    
+                    const item = {};
+
+                    for (let j = 0; j < headers.length; j++) {
+                        const headerKey = headers[j].trim();
+                        const dbField = CSV_HEADER_MAP[headerKey];
+                        const value = values[j] ? values[j].trim() : '';
+                        
+                        if (dbField && value) {
+                            if (dbField === 'notes') {
+                                // 將所有額外的/備註類型的欄位合併到 notes
+                                item.notes = item.notes ? `${item.notes}\n${headerKey}: ${value}` : `${headerKey}: ${value}`;
+                            } else if (dbField === 'contactPerson' && item.contactPerson) {
+                                // 避免重複寫入 contactPerson (如果 CSV 有多個欄位對應到 contactPerson)
+                                continue;
+                            }
+                            else {
+                                item[dbField] = value;
+                            }
+                        }
+                    }
+                    
+                    // 確保最基本的兩個欄位都有值才匯入
+                    if (item.companyName && item.contactPerson) {
+                         data.push(item);
+                    }
+                }
+
+                this.csvImportData.data = data;
+                const startImportButton = document.getElementById('start-import-button');
+                startImportButton.disabled = data.length === 0;
+                startImportButton.textContent = `開始匯入 (${data.length} 筆資料)`;
+
+                if (data.length === 0) {
+                    importStatus.classList.remove('hidden');
+                    importStatus.textContent = '警告：檔案中沒有找到有效且完整的廠商資料。';
+                } else {
+                     importStatus.classList.add('hidden');
+                }
+            },
+            
+            // 簡單的 CSV 行解析器 (處理逗號分隔和引號)
+            parseCSVLine: function(line) {
+                const values = [];
+                let current = '';
+                let inQuotes = false;
+                
+                for (let i = 0; i < line.length; i++) {
+                    const char = line[i];
+                    
+                    if (char === '"') {
+                        if (inQuotes && line[i + 1] === '"') {
+                            current += '"';
+                            i++;
+                        } else {
+                            inQuotes = !inQuotes;
+                        }
+                    } else if (char === ',' && !inQuotes) {
+                        values.push(current);
+                        current = '';
+                    } else {
+                        current += char;
+                    }
+                }
+                values.push(current);
+                return values.map(v => v.trim()); // 確保去除頭尾空格
+            },
+            
+            // 執行匯入到 Firestore (已更新取代邏輯)
+            importVendorsFromCSV: async function() {
+                const category = this.csvImportData.category;
+                const importData = this.csvImportData.data;
+                const importMode = document.getElementById('import-mode-select').value; 
+
+                if (!category || importData.length === 0) {
+                    this.showMessage("匯入資料或類別名稱無效。", 'red');
+                    return;
+                }
+                
+                this.closeImportModal();
+                this.showMessage(`開始執行 [${importMode === 'replace' ? '取代' : '新增'}] 模式到類別 [${category}]...`, 'gray');
+
+                // 步驟 1: 檢查並新增類別 (如果不存在)
+                await this.addCategory(category); 
+                
+                // 步驟 2: 如果是取代模式，先執行批量刪除
+                if (importMode === 'replace') {
+                    try {
+                        const vendorCollectionRef = collection(this.db, this.getVendorCollectionPath());
+                        // 查詢目標類別的所有文件
+                        const q = query(vendorCollectionRef, where("category", "==", category));
+                        const snapshot = await getDocs(q);
+                        
+                        if (snapshot.size > 0) {
+                            this.showMessage(`正在刪除類別 [${category}] 中 ${snapshot.size} 筆舊資料...`, 'red');
+                            const deleteBatch = writeBatch(this.db);
+                            snapshot.docs.forEach(doc => {
+                                deleteBatch.delete(doc.ref);
+                            });
+                            await deleteBatch.commit();
+                            this.showMessage(`成功刪除 ${snapshot.size} 筆舊資料。`, 'red');
+                        } else {
+                            this.showMessage(`類別 [${category}] 中沒有舊資料需要刪除。`, 'gray');
+                        }
+                    } catch (error) {
+                        console.error("批次刪除舊資料錯誤:", error);
+                        this.showMessage("批次刪除舊資料失敗: " + error.message, 'red');
+                        return; // 刪除失敗則中止匯入
+                    }
+                }
+                
+                // 步驟 3: 批次寫入新廠商資料
+                const collectionRef = collection(this.db, this.getVendorCollectionPath());
+                const batch = writeBatch(this.db);
+                const timestamp = serverTimestamp();
+                let importCount = 0;
+                
+                try {
+                    importData.forEach(data => {
+                        // 雙重檢查資料完整性
+                        if (data.companyName && data.contactPerson) {
+                            const newDocRef = doc(collectionRef); 
+                            batch.set(newDocRef, {
+                                ...data,
+                                category: category, 
+                                createdAt: timestamp,
+                            });
+                            importCount++;
+                        }
+                    });
+
+                    if (importCount > 0) {
+                        await batch.commit();
+                        this.showMessage(`成功匯入 ${importCount} 筆廠商資料到 [${category}]！`, 'green');
+                    } else {
+                        this.showMessage("警告：匯入批次中沒有找到有效的資料。", 'red');
+                    }
+
+                    // 重置匯入狀態
+                    this.csvImportData.data = [];
+                    this.csvImportData.category = '';
+                    document.getElementById('csv-file-input').value = '';
+                    
+                } catch (error) {
+                    console.error("批次匯入錯誤:", error);
+                    this.showMessage("資料匯入失敗: " + error.message, 'red');
+                }
+            },
+            
+            // ------------------
+            // CSV 匯出相關
+            // ------------------
+            
+            // 將篩選後的資料匯出為 CSV
+            exportVendorsToCSV: function() {
+                const listContainer = document.getElementById('vendor-list');
+                const vendorsToExport = [];
+                
+                // 這裡改為使用 this.vendors 和篩選邏輯，確保匯出的是完整數據而非僅限於 DOM 中顯示的
+                let filteredVendors = this.vendors;
+
+                if (this.currentCategory) {
+                    filteredVendors = filteredVendors.filter(v => v.category === this.currentCategory);
+                }
+
+                if (this.searchTerm) {
+                    const term = this.searchTerm;
+                    filteredVendors = filteredVendors.filter(v =>
+                        (v.companyName && v.companyName.toLowerCase().includes(term)) ||
+                        (v.contactPerson && v.contactPerson.toLowerCase().includes(term)) ||
+                        (v.notes && v.notes.toLowerCase().includes(term)) ||
+                        (v.brand && v.brand.toLowerCase().includes(term)) ||
+                        (v.mobile && v.mobile.toLowerCase().includes(term)) ||
+                        (v.phone && v.phone.toLowerCase().includes(term))
+                    );
+                }
+                
+                if (filteredVendors.length === 0) {
+                    this.showMessage("目前沒有可匯出的廠商資料。", 'red');
+                    return;
+                }
+                
+                // 定義匯出 CSV 的欄位順序和標頭
+                const headers = [
+                    "公司名稱", "業務", "手機", "公司電話", "Mail", 
+                    "代理廠牌", "類別", "處理項目/備註"
+                ];
+                
+                const fields = [
+                    "companyName", "contactPerson", "mobile", "phone", "email", 
+                    "brand", "category", "notes"
+                ];
+
+                let csvContent = '\uFEFF' + headers.join(',') + '\n'; // 加上 BOM 確保中文不亂碼
+
+                filteredVendors.forEach(vendor => {
+                    const row = fields.map(field => {
+                        let data = vendor[field] || '';
+                        
+                        // 處理 CSV 特殊字符：如果數據包含逗號、換行符或雙引號，則用雙引號包起來
+                        data = data.toString().replace(/"/g, '""'); // 雙引號轉義
+                        if (data.includes(',') || data.includes('\n') || data.includes('"')) {
+                            data = `"${data}"`;
+                        }
+                        return data;
+                    }).join(',');
+                    csvContent += row + '\n';
+                });
+
+                // 建立 Blob 並觸發下載
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                
+                const now = new Date();
+                const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+                
+                const exportCategory = this.currentCategory ? `_${this.currentCategory}` : '_全部';
+                const filename = `廠商名片資料${exportCategory}_${dateStr}.csv`;
+
+                if (link.download !== undefined) {
+                    const url = URL.createObjectURL(blob);
+                    link.setAttribute('href', url);
+                    link.setAttribute('download', filename);
+                    link.style.visibility = 'hidden';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    this.showMessage(`成功匯出 ${filteredVendors.length} 筆資料為 ${filename}`, 'green');
+                } else {
+                    this.showMessage("瀏覽器不支援自動下載，請手動複製內容。", 'red');
+                }
+            },
+
+
+            // ------------------
+            // UI 相關
+            // ------------------
+
+            // 設定類別篩選下拉選單和 Modal 下拉選單
+            setupCategoryFilters: function() {
+                const categorySelect = document.getElementById('category-select'); 
+                const vendorSelect = document.getElementById('category-field'); 
+
+                if (!categorySelect || !vendorSelect) return;
+
+                const currentSelected = this.currentCategory;
+                // 清空主篩選選單中的動態選項
+                categorySelect.querySelectorAll('option:not([value=""])').forEach(opt => opt.remove());
+                // 清空廠商 Modal 選單
+                vendorSelect.innerHTML = '<option value="">請選擇類別</option>';
+
+                this.dynamicCategories.forEach(cat => {
+                    const optionFilter = document.createElement('option');
+                    optionFilter.value = cat;
+                    optionFilter.textContent = cat;
+                    categorySelect.appendChild(optionFilter);
+
+                    const optionVendor = document.createElement('option');
+                    optionVendor.value = cat;
+                    optionVendor.textContent = cat;
+                    vendorSelect.appendChild(optionVendor);
+                });
+                
+                categorySelect.value = currentSelected;
+            },
+            
+            // 渲染類別維護 Modal 中的列表
+            renderCustomCategoryList: function() {
+                const listContainer = document.getElementById('custom-category-list');
+                if (!listContainer) return;
+                
+                listContainer.innerHTML = '';
+                
+                // 只顯示動態新增的類別 (排除 BASE_CATEGORIES)
+                const customCategories = Array.from(this.categoryMap.values()).filter(c => !this.BASE_CATEGORIES.includes(c.name));
+                
+                if (customCategories.length === 0) {
+                    listContainer.innerHTML = '<p class="text-sm text-gray-500 p-2">目前沒有自定義類別。</p>';
+                    return;
+                }
+
+                customCategories.sort((a, b) => a.name.localeCompare(b.name, 'zh-TW')).forEach(cat => {
+                    const div = document.createElement('div');
+                    div.className = 'flex items-center justify-between p-2 bg-white hover:bg-gray-50 rounded-lg border border-gray-200 shadow-sm transition';
+                    div.innerHTML = `
+                        <span class="text-sm font-medium text-gray-700 truncate flex-grow">${cat.name}</span>
+                        <div class="flex space-x-2 flex-shrink-0">
+                            <button onclick="app.openCategoryEditModal('${cat.id}', '${cat.name.replace(/'/g, "\\'")}')"
+                                    type="button" title="編輯類別名稱"
+                                    class="text-blue-500 hover:text-blue-700 transition p-1 rounded-md">
+                                <i data-lucide="pencil" class="w-4 h-4"></i>
+                            </button>
+                            <button onclick="app.deleteCategory('${cat.id}', '${cat.name.replace(/'/g, "\\'")}')"
+                                    type="button" title="刪除類別"
+                                    class="text-red-500 hover:text-red-700 transition p-1 rounded-md">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    `;
+                    listContainer.appendChild(div);
+                    
+                    // 重新初始化卡片內的 Lucide icons 
+                    setTimeout(() => {
+                        import('https://cdn.jsdelivr.net/npm/lucide-esm@latest/umd/lucide-esm.js').then(module => {
+                            module.createIcons({
+                                icons: { Pencil: module.Pencil, Trash2: module.Trash2 }, 
+                                attrs: { width: 16, height: 16 },
+                                container: div 
+                            });
+                        });
+                    }, 0);
+                });
+            },
+            
+            // 篩選類別
+            selectCategory: function(category) {
+                this.currentCategory = category;
+                this.renderVendors();
+            },
+
+            // 更新搜尋詞彙
+            updateFilter: function() {
+                const searchInput = document.getElementById('search-input');
+                if (searchInput) {
+                    this.searchTerm = searchInput.value.toLowerCase().trim();
+                    this.renderVendors();
+                }
+            },
+            
+            // 渲染廠商列表
+            renderVendors: function() {
+                const listContainer = document.getElementById('vendor-list');
+                const loadingMessage = document.getElementById('loading-message');
+                const noResultsMessage = document.getElementById('no-results-message');
+
+                if (!listContainer || !loadingMessage || !noResultsMessage) {
+                    return;
+                }
+
+                loadingMessage.classList.add('hidden');
+                listContainer.innerHTML = '';
+
+                let filteredVendors = this.vendors;
+
+                if (this.currentCategory) {
+                    filteredVendors = filteredVendors.filter(v => v.category === this.currentCategory);
+                }
+
+                if (this.searchTerm) {
+                    const term = this.searchTerm;
+                    filteredVendors = filteredVendors.filter(v =>
+                        (v.companyName && v.companyName.toLowerCase().includes(term)) ||
+                        (v.contactPerson && v.contactPerson.toLowerCase().includes(term)) ||
+                        (v.notes && v.notes.toLowerCase().includes(term)) ||
+                        (v.brand && v.brand.toLowerCase().includes(term)) ||
+                        (v.mobile && v.mobile.toLowerCase().includes(term)) ||
+                        (v.phone && v.phone.toLowerCase().includes(term)) ||
+                        (v.email && v.email.toLowerCase().includes(term)) 
+                    );
+                }
+
+                if (filteredVendors.length === 0) {
+                    noResultsMessage.classList.remove('hidden');
+                } else {
+                    noResultsMessage.classList.add('hidden');
+                }
+                
+                filteredVendors.forEach(vendor => {
+                    listContainer.appendChild(this.createVendorCard(vendor));
+                });
+            },
+
+            // 建立單個廠商卡片
+            createVendorCard: function(vendor) {
+                const card = document.createElement('div');
+                card.className = 'bg-white p-5 rounded-2xl shadow-lg border-t-4 border-blue-500 hover:shadow-xl transition duration-300';
+                
+                const html = `
+                    <div class="flex justify-between items-start mb-3">
+                        <h3 class="text-xl font-bold text-gray-800 break-words">${vendor.companyName || 'N/A'}</h3>
+                        <span class="text-xs font-semibold px-3 py-1 bg-blue-100 text-blue-700 rounded-full flex-shrink-0">${vendor.category || '未分類'}</span>
+                    </div>
+                    
+                    <div class="space-y-2 text-gray-600">
+                        <p class="flex items-center text-sm">
+                            <i data-lucide="user" class="w-4 h-4 mr-2 text-blue-500"></i>
+                            <span class="font-medium">業務:</span> ${vendor.contactPerson || 'N/A'}
+                        </p>
+                        ${vendor.mobile ? `<p class="flex items-center text-sm">
+                            <i data-lucide="smartphone" class="w-4 h-4 mr-2 text-blue-500"></i>
+                            <span class="font-medium">手機:</span> <a href="tel:${vendor.mobile}" class="text-blue-600 hover:underline">${vendor.mobile}</a>
+                        </p>` : ''}
+                        ${vendor.phone ? `<p class="flex items-center text-sm">
+                            <i data-lucide="phone" class="w-4 h-4 mr-2 text-blue-500"></i>
+                            <span class="font-medium">電話:</span> <a href="tel:${vendor.phone}" class="text-blue-600 hover:underline">${vendor.phone}</a>
+                        </p>` : ''}
+                        ${vendor.email ? `<p class="flex items-center text-sm truncate">
+                            <i data-lucide="mail" class="w-4 h-4 mr-2 text-blue-500"></i>
+                            <span class="font-medium">Email:</span> <a href="mailto:${vendor.email}" class="text-blue-600 hover:underline">${vendor.email}</a>
+                        </p>` : ''}
+                        ${vendor.brand ? `<p class="flex items-center text-sm">
+                            <i data-lucide="layers" class="w-4 h-4 mr-2 text-blue-500"></i>
+                            <span class="font-medium">廠牌:</span> ${vendor.brand}
+                        </p>` : ''}
+                        ${vendor.notes ? `<p class="text-sm border-t pt-2 mt-2">
+                            <span class="font-medium text-gray-700">處理項目/備註:</span> ${vendor.notes.replace(/\n/g, '<br>')}
+                        </p>` : ''}
+                    </div>
+
+                    <!-- 操作按鈕 -->
+                    <div class="mt-4 flex justify-end space-x-2 border-t pt-3">
+                        <button onclick="app.openVendorModal('edit', '${vendor.id}')"
+                                class="flex items-center text-blue-600 hover:text-blue-800 text-sm font-medium transition">
+                            <i data-lucide="edit" class="w-4 h-4 mr-1"></i> 編輯
+                        </button>
+                        <button onclick="app.deleteVendor('${vendor.id}', '${(vendor.companyName || 'N/A').replace(/'/g, "\\'")}')"
+                                class="flex items-center text-red-600 hover:text-red-800 text-sm font-medium transition">
+                            <i data-lucide="trash-2" class="w-4 h-4 mr-1"></i> 刪除
+                        </button>
+                    </div>
+                `;
+                card.innerHTML = html;
+                
+                // 重新初始化卡片內的 Lucide icons 
+                setTimeout(() => {
+                    import('https://cdn.jsdelivr.net/npm/lucide-esm@latest/umd/lucide-esm.js').then(module => {
+                        module.createIcons({
+                            icons: { 
+                                User: module.User, Phone: module.Phone, Smartphone: module.Smartphone, Mail: module.Mail, 
+                                Layers: module.Layers, NotebookText: module.NotebookText, Edit: module.Edit, Trash2: module.Trash2
+                            }, 
+                            attrs: { width: 18, height: 18, class: 'mr-2' },
+                            container: card 
+                        });
+                    });
+                }, 0);
+
+
+                return card;
+            },
+
+            // 顯示廠商 Modal (新增/編輯)
+            openVendorModal: function(mode, vendorId = null) {
+                const modal = document.getElementById('vendor-modal');
+                const title = document.getElementById('modal-title');
+                const saveButton = document.getElementById('save-button');
+                const form = document.getElementById('vendor-form');
+                form.reset();
+
+                document.getElementById('vendor-id-field').value = '';
+
+                if (mode === 'add') {
+                    title.textContent = '新增廠商名片';
+                    saveButton.textContent = '儲存名片資料';
+                } else if (mode === 'edit' && vendorId) {
+                    const vendor = this.vendors.find(v => v.id === vendorId);
+                    if (!vendor) {
+                        this.showMessage("找不到廠商資料進行編輯。", 'red');
+                        return;
+                    }
+                    title.textContent = `編輯：${vendor.companyName || 'N/A'}`;
+                    saveButton.textContent = '更新名片資料';
+                    
+                    document.getElementById('vendor-id-field').value = vendor.id;
+                    document.getElementById('category-field').value = vendor.category || '';
+                    document.getElementById('company-name-field').value = vendor.companyName || '';
+                    document.getElementById('contact-person-field').value = vendor.contactPerson || '';
+                    document.getElementById('mobile-field').value = vendor.mobile || '';
+                    document.getElementById('phone-field').value = vendor.phone || '';
+                    document.getElementById('email-field').value = vendor.email || '';
+                    document.getElementById('brand-field').value = vendor.brand || '';
+                    document.getElementById('notes-field').value = vendor.notes || '';
+                }
+
+                modal.classList.add('modal-active');
+                modal.classList.remove('modal-inactive');
+            },
+            
+            // 關閉廠商 Modal
+            closeVendorModal: function() {
+                const modal = document.getElementById('vendor-modal');
+                modal.classList.remove('modal-active');
+                modal.classList.add('modal-inactive');
+            },
+            
+            // 顯示類別維護 Modal
+            openCategoryModal: function() {
+                const categoryModal = document.getElementById('category-add-modal');
+                if (!categoryModal) return;
+                
+                const input = document.getElementById('new-category-name-field');
+                if (input) input.value = ''; 
+                
+                this.renderCustomCategoryList();
+
+                categoryModal.classList.add('modal-active');
+                categoryModal.classList.remove('modal-inactive');
+            },
+            
+            // 關閉類別維護 Modal
+            closeCategoryModal: function() {
+                const categoryModal = document.getElementById('category-add-modal');
+                if (categoryModal) {
+                    categoryModal.classList.remove('modal-active');
+                    categoryModal.classList.add('modal-inactive');
+                }
+            },
+            
+            // 顯示類別編輯 Modal
+            openCategoryEditModal: function(id, name) {
+                this.closeCategoryModal(); // 關閉主維護 Modal
+                const editModal = document.getElementById('category-edit-modal');
+                
+                document.getElementById('edit-category-id-field').value = id;
+                document.getElementById('edit-category-name-field').value = name;
+                document.getElementById('edit-category-original-name-field').value = name;
+
+
+                editModal.classList.add('modal-active');
+                editModal.classList.remove('modal-inactive');
+            },
+            
+            // 關閉類別編輯 Modal
+            closeCategoryEditModal: function() {
+                const editModal = document.getElementById('category-edit-modal');
+                editModal.classList.remove('modal-active');
+                editModal.classList.add('modal-inactive');
+            },
+
+            // 處理新增類別表單提交
+            handleCategorySubmit: function(event) {
+                event.preventDefault();
+                const input = document.getElementById('new-category-name-field');
+                if (input) {
+                    this.addCategory(input.value); 
+                    input.value = ''; // 清空輸入框
+                }
+            },
+            
+            // 顯示匯入 Modal
+            openImportModal: function() {
+                const importModal = document.getElementById('import-modal');
+                const fileInput = document.getElementById('csv-file-input');
+                const fileNameDisplay = document.getElementById('file-name-display');
+                const startImportButton = document.getElementById('start-import-button');
+                const importStatus = document.getElementById('import-status');
+                const importInfoDisplay = document.getElementById('import-info-display');
+                
+                if (!importModal) return;
+                
+                // 重置狀態
+                fileInput.value = '';
+                fileNameDisplay.textContent = '尚未選擇檔案';
+                startImportButton.disabled = true;
+                startImportButton.textContent = '請先選擇檔案';
+                importStatus.classList.add('hidden');
+                importInfoDisplay.classList.add('hidden');
+                this.csvImportData.data = [];
+                this.csvImportData.category = '';
+                document.getElementById('import-mode-select').value = 'add'; 
+                document.getElementById('replace-warning').classList.add('hidden');
+
+                
+                importModal.classList.add('modal-active');
+                importModal.classList.remove('modal-inactive');
+            },
+            
+            // 關閉匯入 Modal
+            closeImportModal: function() {
+                const importModal = document.getElementById('import-modal');
+                if (importModal) {
+                    importModal.classList.remove('modal-active');
+                    importModal.classList.add('modal-inactive');
+                }
+            },
+
+            // 顯示訊息提示
+            showMessage: function(message, type = 'green') {
+                const toast = document.getElementById('toast-message');
+                if (!toast) return;
+
+                toast.textContent = message;
+
+                // 顏色樣式
+                toast.className = 'fixed bottom-4 right-4 text-white px-4 py-3 rounded-xl shadow-lg transition-opacity duration-300 z-50';
+                if (type === 'green') {
+                    toast.classList.add('bg-green-600');
+                } else if (type === 'red') {
+                    toast.classList.add('bg-red-600');
+                } else {
+                    toast.classList.add('bg-gray-800');
+                }
+
+                // 顯示
+                toast.classList.remove('opacity-0');
+                toast.classList.add('opacity-100');
+
+                // 5 秒後隱藏
+                setTimeout(() => {
+                    toast.classList.remove('opacity-100');
+                    toast.classList.add('opacity-0');
+                }, 5000);
+            }
+        };
+
+        // 在視窗載入完成後初始化應用程式
+        window.onload = function() {
+            app.initialize();
+        };
+
+    </script>
+</body>
+</html>
