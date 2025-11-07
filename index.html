@@ -152,7 +152,7 @@
                 <ul class="text-xs font-mono bg-gray-100 p-3 rounded-lg text-gray-700">
                     <li><span class="font-bold">公司名稱</span> (必要)</li>
                     <li><span class="font-bold">業務</span> 或 <span class="font-bold">姓名</span> (必要)</li>
-                    <li>手機, Mail, 代理廠牌, 處理項目等</li>
+                    <li>手機, 電話, Mail, 代理廠牌, 處理項目等</li>
                 </ul>
                 
                 <!-- 步驟 1: 選擇檔案 -->
@@ -450,6 +450,8 @@
             '位置': 'notes', 
             '營業項目': 'notes',
             '': 'notes', // 處理空標頭
+            // 處理「單位連絡人」檔案中出現的數字欄位 (可能是分機或電話)
+            '電話_或_分機': 'phone',
         };
 
         // 應用程式狀態物件
@@ -808,12 +810,8 @@
                     };
                     
                     // 嘗試以 UTF-8 或 Big5 (中文常用) 解碼
-                    try {
-                        reader.readAsText(file, 'UTF-8'); 
-                    } catch (e) {
-                         // Fallback
-                        reader.readAsText(file);
-                    }
+                    // 這裡先嘗試讀取，讓 parseCSV 處理
+                    reader.readAsText(file);
                 }
             },
 
@@ -851,7 +849,10 @@
                 
                 // 檢查是否包含必要欄位
                 const hasCompanyName = headers.some(h => h.includes('公司名稱'));
-                const hasContact = headers.some(h => CSV_HEADER_MAP[h.trim()] === 'contactPerson');
+                const hasContact = headers.some(h => {
+                     const dbField = CSV_HEADER_MAP[h.trim()];
+                     return dbField === 'contactPerson';
+                });
 
                 if (!hasCompanyName || !hasContact) {
                     importStatus.classList.remove('hidden');
@@ -875,10 +876,16 @@
 
                     for (let j = 0; j < headers.length; j++) {
                         const headerKey = headers[j].trim();
-                        const dbField = CSV_HEADER_MAP[headerKey];
+                        let dbField = CSV_HEADER_MAP[headerKey];
                         const value = values[j] ? values[j].trim() : '';
                         
                         if (dbField && value) {
+                            
+                            // 修正：針對「單位連絡人」文件，如果欄位是數字且不具備明確標頭，則嘗試將其歸類到 phone
+                            if (this.csvImportData.category === '單位連絡人' && dbField === 'notes' && !isNaN(value) && !item.phone) {
+                                dbField = 'phone';
+                            }
+                            
                             if (dbField === 'notes') {
                                 // 將所有額外的/備註類型的欄位合併到 notes
                                 item.notes = item.notes ? `${item.notes}\n${headerKey}: ${value}` : `${headerKey}: ${value}`;
@@ -886,13 +893,21 @@
                                 // 避免重複寫入 contactPerson (如果 CSV 有多個欄位對應到 contactPerson)
                                 continue;
                             }
-                            else {
+                            else if (dbField === 'phone' && item.phone && value.length > (item.mobile ? item.mobile.length : 0)) {
+                                // 如果已經有 phone，且新值較長 (可能是更完整的號碼)，則取代
+                                item[dbField] = value;
+                            } else if (dbField === 'mobile' && item.mobile && value.length > (item.mobile ? item.mobile.length : 0)) {
+                                // 如果已經有 mobile，且新值較長 (可能是更完整的號碼)，則取代
+                                item[dbField] = value;
+                            }
+                            else if (!item[dbField]) {
                                 item[dbField] = value;
                             }
                         }
                     }
                     
                     // 確保最基本的兩個欄位都有值才匯入
+                    // 修正: 檢查 companyName 和 contactPerson
                     if (item.companyName && item.contactPerson) {
                          data.push(item);
                     }
@@ -905,7 +920,7 @@
 
                 if (data.length === 0) {
                     importStatus.classList.remove('hidden');
-                    importStatus.textContent = '警告：檔案中沒有找到有效且完整的廠商資料。';
+                    importStatus.textContent = '警告：檔案中沒有找到有效且完整的廠商資料 (請檢查「公司名稱」和「業務/姓名」欄位)。';
                 } else {
                      importStatus.classList.add('hidden');
                 }
